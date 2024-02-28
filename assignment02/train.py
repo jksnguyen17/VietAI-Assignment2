@@ -74,14 +74,13 @@ class Trainer:
         if mixed_precision_dtype is None:
             
             # If 'mixed_precision_dtype' is None, use 'nullcontext',
-            self.ctx = nullcontext()
+            self.ctx = None
 
         else:
         
             # TODO Otherwise, use 'torch.amp.autocast' context with the specified dtype, and initialize GradScaler if mixed_precision_dtype is float16.
-            self.ctx = torch.cuda.amp.autocast(dtype=mixed_precision_dtype)
-            if mixed_precision_dtype == torch.float16:
-                self.gradscaler = torch.cuda.amp.GradScaler()
+            self.ctx = None
+            self.gradscaler = None
 
     def _set_ddp_training(self):
 
@@ -90,14 +89,6 @@ class Trainer:
         # and output device for the data parallelism.
 
         ### YOUR CODE HERE ###
-        # Set the current device based on local_rank
-        torch.cuda.set_device(local_rank)
-        
-        # Move model to the correct device
-        self.model.to(local_rank)
-        
-        # Wrap model with DistributedDataParallel
-        self.model = DDP(self.model, device_ids=[local_rank], output_device=local_rank)
 
         self.model = None
 
@@ -121,11 +112,7 @@ class Trainer:
         if self.mixed_precision_dtype == torch.float16:
 
             ### YOUR CODE HERE ###
-            with torch.cuda.amp.autocast():
-                scaled_loss = self.gradscaler.scale(loss)
-                scaled_loss.backward()
-                self.gradscaler.step(self.optimizer)
-                self.gradscaler.update()
+            
             pass
         else:
             loss.backward()
@@ -172,9 +159,9 @@ class Trainer:
                     ### YOUR CODE HERE ###
                     
                     # TODO: optimizer step
-                    self.gradscaler.step(self.optimizer)
+
                     # TODO: update scaler factor
-                    self.gradscaler.update()
+
                     pass
                 else:
                     self.optimizer.step()
@@ -210,18 +197,9 @@ class Trainer:
         # Also add drop_last to True.
 
         ### YOUR CODE HERE ###
-        # Assuming 'self.batch_size', 'self.is_ddp_training', and 'self.tokenizer' are defined
-
-        if self.is_ddp_training:
-            # For distributed training, use DistributedSampler
-            train_sampler = DistributedSampler(train_dataset)
-        else:
-            # Non-distributed training does not use a sampler
-            train_sampler = None
-
         collate_fn = DataCollatorForSeq2Seq(
             tokenizer=self.tokenizer,
-            padding="longest",
+            padding=8,
             pad_to_multiple_of=8,
             return_tensors="pt"
         )
@@ -229,7 +207,7 @@ class Trainer:
         data_trainloader = DataLoader(
             train_dataset,
             batch_size=self.batch_size,
-            sampler=train_sampler,
+            sampler=None,
             collate_fn=collate_fn,
             drop_last=True
         )
@@ -364,17 +342,18 @@ def load_pretrained_model(local_rank, model_path: str = ""):
     # We will then use the config to initialize a LoraModelForCasualLM with the loaded model.
 
     ### YOUR CODE HERE ###
-    peft_config = LoraConfig(
+    lora_config = LoraConfig(
         r=4,
         lora_alpha=8,
         lora_dropout=0.05,
         bias="none",
         task_type="CAUSAL_LM",
         target_modules=['lm_head.linear', 'transformer.wte']
-    )
+    ) 
 
     # TODO: Create LoRA model
-    model = get_peft_model(model, peft_config)  # Apply current model to Lora Model
+
+    model = get_peft_model(model, lora_config)  # Apply current model to Lora Model
 
     if _is_master_process():
         model.print_trainable_parameters()
@@ -417,8 +396,7 @@ if __name__ == "__main__":
         # Initialize the process group
 
         ### YOUR CODE HERE ###
-        torch.distributed.init_process_group(backend="nccl")
-        local_rank = int(os.environ["LOCAL_RANK"])
+        
         pass
     else:
         os.environ['RANK'] = '0'
