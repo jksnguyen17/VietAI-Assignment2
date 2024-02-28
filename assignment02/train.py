@@ -74,7 +74,7 @@ class Trainer:
         if mixed_precision_dtype is None:
             
             # If 'mixed_precision_dtype' is None, use 'nullcontext',
-            self.ctx = contextlib.nullcontext()
+            self.ctx = nullcontext()
 
         else:
         
