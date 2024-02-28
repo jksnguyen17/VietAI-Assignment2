@@ -199,7 +199,7 @@ class Trainer:
         ### YOUR CODE HERE ###
         collate_fn = DataCollatorForSeq2Seq(
             tokenizer=self.tokenizer,
-            padding=8,
+            padding=True,
             pad_to_multiple_of=8,
             return_tensors="pt"
         )
