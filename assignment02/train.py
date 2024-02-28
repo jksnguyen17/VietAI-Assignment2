@@ -99,8 +99,6 @@ class Trainer:
         # Wrap model with DistributedDataParallel
         self.model = DDP(self.model, device_ids=[local_rank], output_device=local_rank)
 
-        self.model = None
-
     def _run_batch(self, batch):
         """
         Run a single training batch.
